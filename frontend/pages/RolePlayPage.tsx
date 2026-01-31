@@ -2,9 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Customer, Interaction, RolePlayEvaluation } from '../types';
-import { startRolePlayChat, evaluateRolePlay, transcribeAudio } from '../services/geminiService';
-// Fix: Import proper type for Gemini response
-import { GenerateContentResponse } from "@google/genai";
+import { rolePlayInit, rolePlayMessage, evaluateRolePlay, transcribeAudio } from '../services/aiService';
 import { 
   Send, 
   ArrowLeft, 
@@ -37,8 +35,7 @@ const RolePlayPage: React.FC<Props> = ({ customers, interactions }) => {
   const [isTyping, setIsTyping] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evaluation, setEvaluation] = useState<RolePlayEvaluation | null>(null);
-  const [chatInstance, setChatInstance] = useState<any>(null);
-  
+
   // 语音相关状态
   const [recording, setRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -54,11 +51,13 @@ const RolePlayPage: React.FC<Props> = ({ customers, interactions }) => {
 
   useEffect(() => {
     if (customer) {
-      const chat = startRolePlayChat(customer, customerContext);
-      setChatInstance(chat);
-      initChat(chat);
+      setIsTyping(true);
+      rolePlayInit(customer, customerContext)
+        .then((text) => setMessages(text ? [{ role: 'model', text }] : []))
+        .catch(console.error)
+        .finally(() => setIsTyping(false));
     }
-  }, [customer]);
+  }, [customer?.id]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -66,12 +65,12 @@ const RolePlayPage: React.FC<Props> = ({ customers, interactions }) => {
     }
   }, [messages, isTyping]);
 
-  const initChat = async (chat: any) => {
+  const initChat = async () => {
+    if (!customer) return;
     setIsTyping(true);
     try {
-      const result = await chat.sendMessage({ message: "请作为客户开始这段对话。" });
-      // GUIDELINE: Always access .text property directly
-      setMessages([{ role: 'model', text: result.text || "" }]);
+      const text = await rolePlayInit(customer, customerContext);
+      setMessages(text ? [{ role: 'model', text }] : []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -133,26 +132,16 @@ const RolePlayPage: React.FC<Props> = ({ customers, interactions }) => {
   };
 
   const sendMessage = async (text: string) => {
-    if (!text.trim() || !chatInstance || isTyping || evaluation) return;
+    if (!text.trim() || !customer || isTyping || evaluation) return;
 
-    setMessages(prev => [...prev, { role: 'user', text }]);
+    const newUserMsg = { role: 'user' as const, text };
+    setMessages((prev) => [...prev, newUserMsg]);
     setIsTyping(true);
 
     try {
-      const response = await chatInstance.sendMessageStream({ message: text });
-      let fullText = "";
-      setMessages(prev => [...prev, { role: 'model', text: "" }]);
-      
-      for await (const chunk of response) {
-        // GUIDELINE: Properly type the chunk and use .text property
-        const c = chunk as GenerateContentResponse;
-        fullText += c.text || "";
-        setMessages(prev => {
-          const updated = [...prev];
-          updated[updated.length - 1].text = fullText;
-          return updated;
-        });
-      }
+      const historyWithUser = [...messages, newUserMsg];
+      const reply = await rolePlayMessage(customer, customerContext, historyWithUser, text);
+      setMessages((prev) => [...prev, { role: 'model', text: reply || '' }]);
     } catch (err) {
       console.error(err);
     } finally {
@@ -363,7 +352,7 @@ const RolePlayPage: React.FC<Props> = ({ customers, interactions }) => {
 
               <div className="flex gap-4">
                 <button 
-                  onClick={() => { setEvaluation(null); setMessages([]); initChat(chatInstance); }}
+                  onClick={() => { setEvaluation(null); setMessages([]); void initChat(); }}
                   className="flex-1 py-4 bg-gray-100 text-gray-600 rounded-2xl font-bold hover:bg-gray-200"
                 >
                   再练一次

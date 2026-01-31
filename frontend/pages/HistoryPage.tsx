@@ -10,7 +10,7 @@ import {
   Loader2 
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { extractSearchKeywords } from '../services/geminiService';
+import { extractSearchKeywords } from '../services/aiService';
 
 const HistoryPage: React.FC<{ interactions: Interaction[] }> = ({ interactions }) => {
   const [searchTerm, setSearchTerm] = useState('');

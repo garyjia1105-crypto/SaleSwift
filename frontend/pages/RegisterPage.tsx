@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Zap, Mail, Lock, Loader2, ArrowRight, User, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Zap, Mail, Lock, Loader2, ArrowRight, User, ShieldCheck } from 'lucide-react';
+import { api, setToken } from '../services/api';
 
 interface Props {
   onLogin: () => void;
@@ -17,33 +18,35 @@ const RegisterPage: React.FC<Props> = ({ onLogin }) => {
     confirmPassword: ''
   });
   const [error, setError] = useState('');
-  const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setError('');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
       setError('两次输入的密码不一致');
       return;
     }
-    
+    setError('');
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const { token } = await api.auth.register(formData.email, formData.password);
+      setToken(token);
       onLogin();
+    } catch (err: unknown) {
+      setError((err as Error)?.message || '注册失败');
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   const handleGoogleLogin = () => {
     setGoogleLoading(true);
-    setTimeout(() => {
-      onLogin();
-      setGoogleLoading(false);
-    }, 1800);
+    setError('Google 登录暂未开放，请使用邮箱注册');
+    setGoogleLoading(false);
   };
 
   return (

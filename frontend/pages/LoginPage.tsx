@@ -1,33 +1,40 @@
 
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Zap, Mail, Lock, Loader2, ArrowRight, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Zap, Mail, Lock, Loader2, ArrowRight, ShieldCheck } from 'lucide-react';
+import { api, setToken } from '../services/api';
 
 interface Props {
   onLogin: () => void;
 }
 
 const LoginPage: React.FC<Props> = ({ onLogin }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const { token } = await api.auth.login(email, password);
+      setToken(token);
       onLogin();
+    } catch (err: unknown) {
+      setError((err as Error)?.message || '登录失败');
+    } finally {
       setLoading(false);
-    }, 1200);
+    }
   };
 
   const handleGoogleLogin = () => {
     setGoogleLoading(true);
-    // Simulate Official Google OAuth 2.0 Flow
-    setTimeout(() => {
-      onLogin();
-      setGoogleLoading(false);
-    }, 1800);
+    setError('Google 登录暂未开放，请使用邮箱密码登录');
+    setGoogleLoading(false);
   };
 
   return (
@@ -60,13 +67,16 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
 
         <div className="w-full bg-white/80 backdrop-blur-lg p-8 rounded-[36px] border border-white shadow-2xl shadow-blue-900/5">
           <form onSubmit={handleSubmit} className="space-y-4">
+            {error && <p className="text-[10px] text-rose-500 font-bold px-1">{error}</p>}
             <div className="space-y-3">
               <div className="relative group">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-blue-500 transition-colors" size={14} />
                 <input 
                   type="email" 
-                  defaultValue="james@saleswift.ai"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="请输入电子邮箱" 
+                  required
                   className="w-full pl-10 pr-4 py-3.5 bg-gray-50/50 border border-transparent rounded-2xl outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all text-xs font-semibold placeholder:text-gray-400"
                 />
               </div>
@@ -74,8 +84,10 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-blue-500 transition-colors" size={14} />
                 <input 
                   type="password" 
-                  defaultValue="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="请输入登录密码" 
+                  required
                   className="w-full pl-10 pr-4 py-3.5 bg-gray-50/50 border border-transparent rounded-2xl outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all text-xs font-semibold placeholder:text-gray-400"
                 />
               </div>

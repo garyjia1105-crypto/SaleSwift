@@ -15,7 +15,7 @@ import {
   Calendar,
   X
 } from 'lucide-react';
-import { parseScheduleVoice } from '../services/geminiService';
+import { parseScheduleVoice } from '../services/aiService';
 import { translations, Language } from '../translations';
 
 interface Props {

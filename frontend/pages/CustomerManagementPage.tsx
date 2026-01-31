@@ -16,7 +16,7 @@ import {
   Filter
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { extractSearchKeywords } from '../services/geminiService';
+import { extractSearchKeywords } from '../services/aiService';
 import { translations, Language } from '../translations';
 
 interface Props {

@@ -14,15 +14,15 @@ import {
   Trash2,
   ChevronRight
 } from 'lucide-react';
-import { analyzeSalesInteraction } from '../services/geminiService';
+import { analyzeSalesInteraction } from '../services/aiService';
 import { Interaction, Customer } from '../types';
 import { translations, Language } from '../translations';
 
 interface Props {
-  onSave: (interaction: Interaction) => void;
+  onSave: (interaction: Interaction) => void | Promise<Interaction | null>;
   customers: Customer[];
   interactions: Interaction[];
-  onAddCustomer: (customer: Customer) => Customer;
+  onAddCustomer: (customer: Customer) => Customer | Promise<Customer>;
   lang: Language;
 }
 
@@ -50,7 +50,7 @@ const NewInteractionPage: React.FC<Props> = ({ onSave, customers, interactions, 
       const aiResult = await analyzeSalesInteraction(input, audioPayload);
       if (aiResult) {
         const result: Interaction = { ...aiResult, id: 'int-' + Date.now(), date: new Date().toISOString(), rawInput: input || "Voice Input" };
-        if (selectedCustomerId) { finalizeSave(result, selectedCustomerId); return; }
+        if (selectedCustomerId) { await finalizeSave(result, selectedCustomerId); return; }
         setPendingResult(result);
         setNewCustomerData({ name: aiResult.customerProfile.name || '', company: aiResult.customerProfile.company || '' });
         setShowLinkModal(true);
@@ -58,9 +58,9 @@ const NewInteractionPage: React.FC<Props> = ({ onSave, customers, interactions, 
     } catch (e) { console.error(e); } finally { setIsAnalyzing(false); }
   };
 
-  const finalizeSave = (result: Interaction, customerId: string) => {
-    onSave({ ...result, customerId });
-    navigate(`/interaction/${result.id}`);
+  const finalizeSave = async (result: Interaction, customerId: string) => {
+    const saved = await onSave({ ...result, customerId });
+    if (saved) navigate(`/interaction/${saved.id}`);
   };
 
   const removeFile = () => {
@@ -199,7 +199,7 @@ const NewInteractionPage: React.FC<Props> = ({ onSave, customers, interactions, 
                 <h3 className="text-sm font-bold">Link Customer Profile</h3>
                 <div className="space-y-2 max-h-40 overflow-y-auto no-scrollbar">
                   {customers.slice(0, 3).map(c => (
-                    <button key={c.id} onClick={() => finalizeSave(pendingResult!, c.id)} className="w-full p-3 bg-gray-50 rounded-xl flex justify-between items-center text-left active:bg-blue-50">
+                    <button key={c.id} onClick={() => void finalizeSave(pendingResult!, c.id)} className="w-full p-3 bg-gray-50 rounded-xl flex justify-between items-center text-left active:bg-blue-50">
                       <div><p className="font-bold text-xs">{c.name}</p><p className="text-[9px] text-gray-400">{c.company}</p></div>
                       <CheckCircle2 className="text-gray-200" size={14} />
                     </button>
@@ -211,7 +211,7 @@ const NewInteractionPage: React.FC<Props> = ({ onSave, customers, interactions, 
                 </div>
               </div>
             ) : (
-              <form onSubmit={(e)=>{e.preventDefault(); const c = onAddCustomer({id:'c-'+Date.now(), ...newCustomerData, industry:'', role:'', tags:[], createdAt:new Date().toISOString()}); finalizeSave(pendingResult!, c.id);}} className="space-y-3">
+              <form onSubmit={async (e)=>{e.preventDefault(); const c = await onAddCustomer({id:'c-'+Date.now(), ...newCustomerData, industry:'', role:'', tags:[], createdAt:new Date().toISOString()} as Customer); await finalizeSave(pendingResult!, c.id);}} className="space-y-3">
                 <h3 className="text-sm font-bold mb-2">Create New Client</h3>
                 <input placeholder="Name" required className="w-full px-3 py-2 bg-gray-50 rounded-lg text-xs outline-none" value={newCustomerData.name} onChange={e=>setNewCustomerData({...newCustomerData, name: e.target.value})} />
                 <input placeholder="Company" required className="w-full px-3 py-2 bg-gray-50 rounded-lg text-xs outline-none" value={newCustomerData.company} onChange={e=>setNewCustomerData({...newCustomerData, company: e.target.value})} />

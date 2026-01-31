@@ -23,7 +23,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { translations, Language } from '../translations';
-import { generateCoursePlan } from '../services/geminiService';
+import { generateCoursePlan } from '../services/aiService';
 
 interface Props {
   customers: Customer[];

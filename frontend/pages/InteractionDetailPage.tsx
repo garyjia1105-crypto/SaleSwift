@@ -26,7 +26,7 @@ import {
   User as UserIcon
 } from 'lucide-react';
 import { Interaction, Schedule } from '../types';
-import { deepDiveIntoInterest, continueDeepDiveIntoInterest, askAboutInteraction } from '../services/geminiService';
+import { deepDiveIntoInterest, continueDeepDiveIntoInterest, askAboutInteraction } from '../services/aiService';
 import { translations, Language } from '../translations';
 
 const DetailSection: React.FC<{ title: string, icon: React.ReactNode, children: React.ReactNode, variant?: 'primary' | 'secondary' | 'default' }> = ({ title, icon, children, variant = 'default' }) => {

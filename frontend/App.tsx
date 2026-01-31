@@ -22,6 +22,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import { Interaction, Customer, Schedule, CoursePlan } from './types';
 import { translations, Language } from './translations';
+import { api, setToken, getToken } from './services/api';
 
 export type Theme = 'classic' | 'dark' | 'minimal' | 'nature';
 
@@ -53,18 +54,19 @@ const MobileNavItem: React.FC<{
 };
 
 const App: React.FC = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => localStorage.getItem('isLoggedIn') === 'true');
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => !!getToken());
   const [language, setLanguage] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'zh');
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'classic');
   const [avatar, setAvatar] = useState<string | null>(() => localStorage.getItem('user_avatar'));
   const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('custom_api_key') || '');
   const [aiModel, setAiModel] = useState<string>(() => localStorage.getItem('custom_ai_model') || 'gemini-3-flash-preview');
-  
+  const [dataLoading, setDataLoading] = useState(false);
+
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [coursePlans, setCoursePlans] = useState<CoursePlan[]>([]);
-  
+
   const location = useLocation();
   const navigate = useNavigate();
   const t = translations[language];
@@ -91,71 +93,126 @@ const App: React.FC = () => {
   }, [aiModel]);
 
   useEffect(() => {
-    if (isLoggedIn) {
-      const savedInteractions = localStorage.getItem('sales_interactions');
-      const savedCustomers = localStorage.getItem('sales_customers');
-      const savedSchedules = localStorage.getItem('sales_schedules');
-      const savedCoursePlans = localStorage.getItem('sales_course_plans');
-      if (savedInteractions) setInteractions(JSON.parse(savedInteractions));
-      if (savedCustomers) setCustomers(JSON.parse(savedCustomers));
-      if (savedSchedules) setSchedules(JSON.parse(savedSchedules));
-      if (savedCoursePlans) setCoursePlans(JSON.parse(savedCoursePlans));
-    }
+    if (!isLoggedIn) return;
+    setDataLoading(true);
+    Promise.all([
+      api.interactions.list(),
+      api.customers.list(),
+      api.schedules.list(),
+      api.coursePlans.list(),
+    ])
+      .then(([ints, custs, scheds, plans]) => {
+        setInteractions(ints as Interaction[]);
+        setCustomers(custs as Customer[]);
+        setSchedules(scheds as Schedule[]);
+        setCoursePlans(plans as CoursePlan[]);
+      })
+      .catch(() => {})
+      .finally(() => setDataLoading(false));
   }, [isLoggedIn]);
 
   const handleLogin = () => {
     setIsLoggedIn(true);
-    localStorage.setItem('isLoggedIn', 'true');
     navigate('/');
   };
 
   const handleLogout = () => {
+    setToken(null);
     setIsLoggedIn(false);
-    localStorage.removeItem('isLoggedIn');
     navigate('/login');
   };
 
-  const saveInteraction = (newInteraction: Interaction) => {
-    const updated = [newInteraction, ...interactions];
-    setInteractions(updated);
-    localStorage.setItem('sales_interactions', JSON.stringify(updated));
+  const saveInteraction = async (newInteraction: Interaction) => {
+    try {
+      const created = await api.interactions.create({
+        customerId: newInteraction.customerId,
+        date: newInteraction.date,
+        rawInput: newInteraction.rawInput,
+        customerProfile: newInteraction.customerProfile,
+        intelligence: newInteraction.intelligence,
+        metrics: newInteraction.metrics,
+        suggestions: newInteraction.suggestions,
+      });
+      const full = { ...newInteraction, id: created.id } as Interaction;
+      setInteractions((prev) => [full, ...prev]);
+      return full;
+    } catch {
+      return null;
+    }
   };
 
   const saveCustomers = (newCustomers: Customer[]) => {
     setCustomers(newCustomers);
-    localStorage.setItem('sales_customers', JSON.stringify(newCustomers));
   };
 
-  const addCustomer = (customer: Customer) => {
-    const updated = [customer, ...customers];
-    saveCustomers(updated);
-    return customer;
+  const addCustomer = async (customer: Customer) => {
+    try {
+      const created = await api.customers.create({
+        name: customer.name,
+        company: customer.company,
+        role: customer.role,
+        industry: customer.industry,
+        email: customer.email,
+        phone: customer.phone,
+        tags: customer.tags,
+      });
+      setCustomers((prev) => [created as Customer, ...prev]);
+      return created as Customer;
+    } catch {
+      return customer;
+    }
   };
 
-  const updateCustomer = (updatedCustomer: Customer) => {
-    const updated = customers.map(c => c.id === updatedCustomer.id ? updatedCustomer : c);
-    saveCustomers(updated);
+  const updateCustomer = async (updatedCustomer: Customer) => {
+    try {
+      const updated = await api.customers.update(updatedCustomer.id, {
+        name: updatedCustomer.name,
+        company: updatedCustomer.company,
+        role: updatedCustomer.role,
+        industry: updatedCustomer.industry,
+        email: updatedCustomer.email,
+        phone: updatedCustomer.phone,
+        tags: updatedCustomer.tags,
+      });
+      setCustomers((prev) => prev.map((c) => (c.id === updated.id ? (updated as Customer) : c)));
+    } catch {}
   };
 
-  const saveSchedules = (newSchedules: Schedule[]) => {
-    setSchedules(newSchedules);
-    localStorage.setItem('sales_schedules', JSON.stringify(newSchedules));
+  const addSchedule = async (schedule: Schedule) => {
+    try {
+      const created = await api.schedules.create({
+        customerId: schedule.customerId,
+        title: schedule.title,
+        date: schedule.date,
+        time: schedule.time,
+        description: schedule.description,
+        status: schedule.status,
+      });
+      setSchedules((prev) => [created as Schedule, ...prev]);
+    } catch {}
   };
 
-  const addSchedule = (schedule: Schedule) => {
-    const updated = [schedule, ...schedules];
-    saveSchedules(updated);
+  const toggleScheduleStatus = async (id: string) => {
+    const s = schedules.find((x) => x.id === id);
+    if (!s) return;
+    const nextStatus = s.status === 'completed' ? 'pending' : 'completed';
+    try {
+      const updated = await api.schedules.update(id, { status: nextStatus });
+      setSchedules((prev) => prev.map((x) => (x.id === id ? (updated as Schedule) : x)));
+    } catch {}
   };
 
-  const toggleScheduleStatus = (id: string) => {
-    const updated = schedules.map(s => s.id === id ? { ...s, status: s.status === 'completed' ? 'pending' : 'completed' as any } : s);
-    saveSchedules(updated);
-  };
-
-  const saveCoursePlan = (plan: CoursePlan) => {
-    const updated = [plan, ...coursePlans.filter(p => p.customerId !== plan.customerId)];
-    setCoursePlans(updated);
-    localStorage.setItem('sales_course_plans', JSON.stringify(updated));
+  const saveCoursePlan = async (plan: CoursePlan) => {
+    try {
+      const created = await api.coursePlans.create({
+        customerId: plan.customerId,
+        title: plan.title,
+        objective: plan.objective,
+        modules: plan.modules,
+        resources: plan.resources,
+      });
+      setCoursePlans((prev) => [created as CoursePlan, ...prev.filter((p) => p.customerId !== plan.customerId)]);
+    } catch {}
   };
 
   const isActive = (path: string) => location.pathname === path;
@@ -170,6 +227,17 @@ const App: React.FC = () => {
 
   if (!isLoggedIn && location.pathname !== '/login' && location.pathname !== '/register') {
     return <LoginPage onLogin={handleLogin} />;
+  }
+
+  if (isLoggedIn && dataLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+          <p className="mt-3 text-sm font-medium text-gray-600">加载中...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
