@@ -42,7 +42,7 @@ interface Props {
 }
 
 const DashboardPage: React.FC<Props> = ({ interactions, lang, theme }) => {
-  const t = translations[lang].dashboard;
+  const t = (translations[lang] ?? translations.zh).dashboard;
   const isDark = theme === 'dark';
   const recentInteractions = interactions.slice(0, 3);
   const stageData = Object.values(SalesStage).map(stage => ({

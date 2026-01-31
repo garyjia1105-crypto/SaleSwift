@@ -15,6 +15,8 @@ View your app in AI Studio: https://ai.studio/apps/drive/1v2U6n07MbLgpjLDmgnjPpB
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. 环境变量（可选）：在 `.env` 或 `.env.local` 中设置
+   - `VITE_API_URL`：后端地址（默认 `http://localhost:4000`）
+   - `VITE_GOOGLE_CLIENT_ID`：Google OAuth 2.0 Web 客户端 ID（与后端 `GOOGLE_OAUTH_CLIENT_ID` 一致，用于登录/注册页 Google 登录）
 3. Run the app:
    `npm run dev`

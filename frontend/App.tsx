@@ -53,10 +53,19 @@ const MobileNavItem: React.FC<{
   );
 };
 
+const VALID_LANGS: Language[] = ['zh', 'en', 'ja', 'ko'];
+const VALID_THEMES: Theme[] = ['classic', 'dark', 'minimal', 'nature'];
+
 const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => !!getToken());
-  const [language, setLanguage] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'zh');
-  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'classic');
+  const [language, setLanguage] = useState<Language>(() => {
+    const lang = localStorage.getItem('language');
+    return (VALID_LANGS.includes(lang as Language) ? lang : 'zh') as Language;
+  });
+  const [theme, setTheme] = useState<Theme>(() => {
+    const th = localStorage.getItem('theme');
+    return (VALID_THEMES.includes(th as Theme) ? th : 'classic') as Theme;
+  });
   const [avatar, setAvatar] = useState<string | null>(() => localStorage.getItem('user_avatar'));
   const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('custom_api_key') || '');
   const [aiModel, setAiModel] = useState<string>(() => localStorage.getItem('custom_ai_model') || 'gemini-3-flash-preview');
@@ -69,7 +78,7 @@ const App: React.FC = () => {
 
   const location = useLocation();
   const navigate = useNavigate();
-  const t = translations[language];
+  const t = translations[language] ?? translations.zh;
 
   useEffect(() => {
     localStorage.setItem('language', language);
@@ -107,7 +116,12 @@ const App: React.FC = () => {
         setSchedules(scheds as Schedule[]);
         setCoursePlans(plans as CoursePlan[]);
       })
-      .catch(() => {})
+      .catch((err) => {
+        if (err?.message?.includes('Unauthorized') || err?.message?.includes('401')) {
+          setToken(null);
+          setIsLoggedIn(false);
+        }
+      })
       .finally(() => setDataLoading(false));
   }, [isLoggedIn]);
 

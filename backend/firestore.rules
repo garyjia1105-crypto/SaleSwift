@@ -1,0 +1,6 @@
+rules_version = '2';
+// 当前架构下 Firestore 仅由后端 Admin SDK 访问，禁止客户端直接读写。
+// 若未来改为前端直连 Firestore，可在此按 request.auth 与 resource.data 扩展规则。
+match /{document=**} {
+  allow read, write: if false;
+}
